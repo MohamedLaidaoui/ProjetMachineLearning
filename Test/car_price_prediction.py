@@ -12,6 +12,9 @@ from sklearn.ensemble import GradientBoostingRegressor, GradientBoostingClassifi
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.svm import SVR, SVC
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, accuracy_score, precision_score, recall_score, f1_score
+from xgboost import XGBRegressor,XGBClassifier
+import matplotlib.pyplot as plt
+import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -30,7 +33,7 @@ numeric_cols = ['Engine size', 'Year of manufacture', 'Mileage']
 target = 'Price'
 
 # Add engineered features
-df['Age'] = 2024 - df['Year of manufacture']
+df['Age'] = 2025 - df['Year of manufacture']
 df['Mileage_per_year'] = df['Mileage'] / (df['Age'] + 1)
 df['Engine_power_estimate'] = df['Engine size'] * 50
 numeric_cols_extended = numeric_cols + ['Age', 'Mileage_per_year', 'Engine_power_estimate']
@@ -122,7 +125,7 @@ regression_results['Gradient Boosting'] = {
     'R2': r2_score(y_test, gb_reg_pred)
 }
 
-# 6. Support Vector Machine (SVR)
+# 6. Support Vector Machine (SVM)
 print("Training SVM Regressor...")
 svr = Pipeline(steps=[('preprocessor', preprocessor), ('model', SVR(kernel='rbf', C=1000, gamma=0.1))])
 svr.fit(X_train, y_train)
@@ -134,19 +137,16 @@ regression_results['SVM'] = {
 }
 
 # 7. XGBoost
-try:
-    from xgboost import XGBRegressor
-    print("Training XGBoost...")
-    xgb_reg = Pipeline(steps=[('preprocessor', preprocessor), ('model', XGBRegressor(n_estimators=500, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8, random_state=42, n_jobs=4))])
-    xgb_reg.fit(X_train, y_train)
-    xgb_reg_pred = xgb_reg.predict(X_test)
-    regression_results['XGBoost'] = {
-        'RMSE': np.sqrt(mean_squared_error(y_test, xgb_reg_pred)),
-        'MAE': mean_absolute_error(y_test, xgb_reg_pred),
-        'R2': r2_score(y_test, xgb_reg_pred)
-    }
-except Exception as e:
-    print(f"XGBoost failed: {e}")
+print("Training XGBoost...")
+xgb_reg = Pipeline(steps=[('preprocessor', preprocessor), ('model', XGBRegressor(n_estimators=500, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8, random_state=42, n_jobs=4))])
+xgb_reg.fit(X_train, y_train)
+xgb_reg_pred = xgb_reg.predict(X_test)
+regression_results['XGBoost'] = {
+    'RMSE': np.sqrt(mean_squared_error(y_test, xgb_reg_pred)),
+    'MAE': mean_absolute_error(y_test, xgb_reg_pred),
+    'R2': r2_score(y_test, xgb_reg_pred)
+}
+
 
 # ============ CLASSIFICATION MODELS ============
 print("\n" + "=" * 90)
@@ -226,20 +226,18 @@ classification_results['SVM'] = {
 }
 
 # 7. XGBoost Classifier
-try:
-    from xgboost import XGBClassifier
-    print("Training XGBoost Classifier...")
-    xgb_cls = Pipeline(steps=[('preprocessor', preprocessor), ('model', XGBClassifier(n_estimators=500, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8, random_state=42, n_jobs=4))])
-    xgb_cls.fit(X_train, y_train_cat)
-    xgb_cls_pred = xgb_cls.predict(X_test)
-    classification_results['XGBoost'] = {
-        'Accuracy': accuracy_score(y_test_cat, xgb_cls_pred),
-        'Precision': precision_score(y_test_cat, xgb_cls_pred, average='weighted', zero_division=0),
-        'Recall': recall_score(y_test_cat, xgb_cls_pred, average='weighted', zero_division=0),
-        'F1': f1_score(y_test_cat, xgb_cls_pred, average='weighted', zero_division=0)
-    }
-except Exception as e:
-    print(f"XGBoost Classifier failed: {e}")
+
+print("Training XGBoost Classifier...")
+xgb_cls = Pipeline(steps=[('preprocessor', preprocessor), ('model', XGBClassifier(n_estimators=500, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8, random_state=42, n_jobs=4))])
+xgb_cls.fit(X_train, y_train_cat)
+xgb_cls_pred = xgb_cls.predict(X_test)
+classification_results['XGBoost'] = {
+    'Accuracy': accuracy_score(y_test_cat, xgb_cls_pred),
+    'Precision': precision_score(y_test_cat, xgb_cls_pred, average='weighted', zero_division=0),
+    'Recall': recall_score(y_test_cat, xgb_cls_pred, average='weighted', zero_division=0),
+    'F1': f1_score(y_test_cat, xgb_cls_pred, average='weighted', zero_division=0)
+}
+print(f"XGBoost Classifier failed: {e}")
 
 # ============ PRINT RESULTS ============
 print("\n\n" + "=" * 90)
@@ -282,3 +280,150 @@ print(f"  - Accuracy:  {best_cls[1]['Accuracy']:.4f} (correct predictions)")
 print(f"  - Precision: {best_cls[1]['Precision']:.4f} (false positive rate)")
 print(f"  - Recall:    {best_cls[1]['Recall']:.4f} (true positive rate)")
 print(f"  - F1:        {best_cls[1]['F1']:.4f} (balance of precision/recall)")
+
+# ============ FEATURE IMPORTANCE ANALYSIS ============
+print("\n" + "=" * 90)
+print("FEATURE IMPORTANCE ANALYSIS - Base Features Only")
+print("=" * 90)
+
+# Define base features (original dataset features only)
+base_features = ['Manufacturer', 'Model', 'Engine size', 'Fuel type', 'Year of manufacture', 'Mileage']
+
+# For XGBoost Regression - Aggregate Feature Importance by Base Feature
+if 'XGBoost' in regression_results:
+    print("\nAnalyzing XGBoost Regression feature importance...")
+    
+    # Get feature names after preprocessing
+    xgb_model = xgb_reg.named_steps['model']
+    
+    # Get feature names from preprocessor
+    cat_features = xgb_reg.named_steps['preprocessor'].named_transformers_['cat'].get_feature_names_out(categorical_cols)
+    num_features = numeric_cols_extended
+    all_features = list(cat_features) + num_features
+    
+    # Get feature importances
+    importances = xgb_model.feature_importances_
+    
+    # Aggregate by base feature
+    base_feature_importance = {}
+    for feature_name, importance in zip(all_features, importances):
+        # Map to base feature
+        if feature_name in ['Engine size', 'Year of manufacture', 'Mileage']:
+            base_feature = feature_name
+        elif feature_name in ['Age', 'Mileage_per_year', 'Engine_power_estimate']:
+            # Skip engineered features
+            continue
+        else:
+            # For categorical (e.g., "Manufacturer_BMW" -> "Manufacturer")
+            base_feature = feature_name.split('_')[0]
+            if base_feature == 'Fuel':
+                base_feature = 'Fuel type'
+        
+        if base_feature in base_features:
+            if base_feature not in base_feature_importance:
+                base_feature_importance[base_feature] = 0
+            base_feature_importance[base_feature] += importance
+    
+    # Convert to DataFrame and sort
+    xgb_base_df = pd.DataFrame(list(base_feature_importance.items()), 
+                                columns=['Feature', 'Importance'])
+    xgb_base_df = xgb_base_df.sort_values('Importance', ascending=False)
+    xgb_base_df['Percentage'] = (xgb_base_df['Importance'] / xgb_base_df['Importance'].sum()) * 100
+    
+    print("\nXGBoost Regression - Base Feature Importance:")
+    print("-" * 90)
+    print(f"{'Feature':<30} {'Importance':>20} {'Percentage':>20}")
+    print("-" * 90)
+    for _, row in xgb_base_df.iterrows():
+        print(f"{row['Feature']:<30} {row['Importance']:>20.4f} {row['Percentage']:>19.2f}%")
+    
+    # Plot XGBoost Base Feature Importance
+    plt.figure(figsize=(14, 10))
+    plt.subplot(2, 1, 1)
+    colors = plt.cm.viridis(np.linspace(0, 1, len(xgb_base_df)))
+    bars = plt.barh(range(len(xgb_base_df)), xgb_base_df['Importance'], color=colors)
+    plt.yticks(range(len(xgb_base_df)), xgb_base_df['Feature'], fontsize=12)
+    plt.xlabel('Importance Score', fontsize=12, fontweight='bold')
+    plt.title('XGBoost Regression - Base Feature Importance\n(Impact on Price)', 
+              fontweight='bold', fontsize=14)
+    plt.gca().invert_yaxis()
+    
+    # Add percentage labels on bars
+    for i, (bar, pct) in enumerate(zip(bars, xgb_base_df['Percentage'])):
+        plt.text(bar.get_width() + 0.005, bar.get_y() + bar.get_height()/2, 
+                f'{pct:.1f}%', va='center', fontsize=10, fontweight='bold')
+    plt.grid(axis='x', alpha=0.3)
+
+# For SVM Classification - Aggregate Permutation Importance by Base Feature
+if 'SVM' in classification_results:
+    print("\n\nAnalyzing SVM Classification feature importance...")
+    
+    from sklearn.inspection import permutation_importance
+    
+    # Calculate permutation importance for SVM
+    X_test_transformed = svc.named_steps['preprocessor'].transform(X_test)
+    perm_importance = permutation_importance(svc.named_steps['model'], X_test_transformed, y_test_cat, 
+                                             n_repeats=10, random_state=42, n_jobs=4)
+    
+    # Get feature names
+    cat_features = svc.named_steps['preprocessor'].named_transformers_['cat'].get_feature_names_out(categorical_cols)
+    num_features = numeric_cols_extended
+    all_features_svm = list(cat_features) + num_features
+    
+    # Aggregate by base feature
+    svm_base_feature_importance = {}
+    for feature_name, importance in zip(all_features_svm, perm_importance.importances_mean):
+        # Map to base feature
+        if feature_name in ['Engine size', 'Year of manufacture', 'Mileage']:
+            base_feature = feature_name
+        elif feature_name in ['Age', 'Mileage_per_year', 'Engine_power_estimate']:
+            # Skip engineered features
+            continue
+        else:
+            # For categorical (e.g., "Manufacturer_BMW" -> "Manufacturer")
+            base_feature = feature_name.split('_')[0]
+            if base_feature == 'Fuel':
+                base_feature = 'Fuel type'
+        
+        if base_feature in base_features:
+            if base_feature not in svm_base_feature_importance:
+                svm_base_feature_importance[base_feature] = 0
+            svm_base_feature_importance[base_feature] += importance
+    
+    # Convert to DataFrame and sort
+    svm_base_df = pd.DataFrame(list(svm_base_feature_importance.items()), 
+                                columns=['Feature', 'Importance'])
+    svm_base_df = svm_base_df.sort_values('Importance', ascending=False)
+    svm_base_df['Percentage'] = (svm_base_df['Importance'] / svm_base_df['Importance'].sum()) * 100
+    
+    print("\nSVM Classification - Base Feature Importance:")
+    print("-" * 90)
+    print(f"{'Feature':<30} {'Importance':>20} {'Percentage':>20}")
+    print("-" * 90)
+    for _, row in svm_base_df.iterrows():
+        print(f"{row['Feature']:<30} {row['Importance']:>20.4f} {row['Percentage']:>19.2f}%")
+    
+    # Plot SVM Base Feature Importance
+    plt.subplot(2, 1, 2)
+    colors = plt.cm.plasma(np.linspace(0, 1, len(svm_base_df)))
+    bars = plt.barh(range(len(svm_base_df)), svm_base_df['Importance'], color=colors)
+    plt.yticks(range(len(svm_base_df)), svm_base_df['Feature'], fontsize=12)
+    plt.xlabel('Importance Score (Permutation)', fontsize=12, fontweight='bold')
+    plt.title('SVM Classification - Base Feature Importance\n(Impact on Price Category)', 
+              fontweight='bold', fontsize=14)
+    plt.gca().invert_yaxis()
+    
+    # Add percentage labels on bars
+    for i, (bar, pct) in enumerate(zip(bars, svm_base_df['Percentage'])):
+        plt.text(bar.get_width() + 0.005, bar.get_y() + bar.get_height()/2, 
+                f'{pct:.1f}%', va='center', fontsize=10, fontweight='bold')
+    plt.grid(axis='x', alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig('feature_importance_base_features.png', dpi=300, bbox_inches='tight')
+    print("\n✓ Saved: feature_importance_base_features.png")
+    plt.show()
+
+print("\n" + "=" * 90)
+print("Analysis complete! Check 'feature_importance_base_features.png' for visual results.")
+print("=" * 90)
