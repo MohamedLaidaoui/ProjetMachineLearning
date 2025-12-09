@@ -213,7 +213,7 @@ classification_results['Gradient Boosting'] = {
     'F1': f1_score(y_test_cat, gb_cls_pred, average='weighted', zero_division=0)
 }
 
-# 6. Support Vector Machine Classifier (SVC)
+# 6. Support Vector Machine Classifier (SVM)
 print("Training SVM Classifier...")
 svc = Pipeline(steps=[('preprocessor', preprocessor), ('model', SVC(kernel='rbf', C=1000, gamma=0.1, random_state=42))])
 svc.fit(X_train, y_train_cat)
@@ -225,19 +225,7 @@ classification_results['SVM'] = {
     'F1': f1_score(y_test_cat, svc_pred, average='weighted', zero_division=0)
 }
 
-# 7. XGBoost Classifier
 
-print("Training XGBoost Classifier...")
-xgb_cls = Pipeline(steps=[('preprocessor', preprocessor), ('model', XGBClassifier(n_estimators=500, learning_rate=0.05, max_depth=6, subsample=0.8, colsample_bytree=0.8, random_state=42, n_jobs=4))])
-xgb_cls.fit(X_train, y_train_cat)
-xgb_cls_pred = xgb_cls.predict(X_test)
-classification_results['XGBoost'] = {
-    'Accuracy': accuracy_score(y_test_cat, xgb_cls_pred),
-    'Precision': precision_score(y_test_cat, xgb_cls_pred, average='weighted', zero_division=0),
-    'Recall': recall_score(y_test_cat, xgb_cls_pred, average='weighted', zero_division=0),
-    'F1': f1_score(y_test_cat, xgb_cls_pred, average='weighted', zero_division=0)
-}
-print(f"XGBoost Classifier failed: {e}")
 
 # ============ PRINT RESULTS ============
 print("\n\n" + "=" * 90)
@@ -427,3 +415,4 @@ if 'SVM' in classification_results:
 print("\n" + "=" * 90)
 print("Analysis complete! Check 'feature_importance_base_features.png' for visual results.")
 print("=" * 90)
+
